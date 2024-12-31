@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { Direction } from '../../types/matrix';
+import { calculateAverageResponse } from '../../utils/matrixCalculations';
 
 interface Response {
   name: string;
@@ -28,6 +29,7 @@ const COLORS = [
 export default function EnhancedRadarChart({ directions, responses, scale }: EnhancedRadarChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [activeResponses, setActiveResponses] = useState<Set<number>>(new Set(responses.map((_, i) => i)));
+  const averageResponse = calculateAverageResponse(responses, directions);
 
   useEffect(() => {
     if (!svgRef.current || directions.length === 0) return;
@@ -62,14 +64,12 @@ export default function EnhancedRadarChart({ directions, responses, scale }: Enh
     levels.forEach(level => {
       const r = radiusScale(level);
       
-      // Círculo
       svg.append('circle')
         .attr('cx', 0)
         .attr('cy', 0)
         .attr('r', r)
         .attr('class', 'fill-none stroke-gray-200');
       
-      // Etiqueta del nivel
       svg.append('text')
         .attr('x', 0)
         .attr('y', -r)
@@ -85,7 +85,6 @@ export default function EnhancedRadarChart({ directions, responses, scale }: Enh
       const x = radius * Math.cos(angle);
       const y = radius * Math.sin(angle);
       
-      // Línea
       svg.append('line')
         .attr('x1', 0)
         .attr('y1', 0)
@@ -93,7 +92,6 @@ export default function EnhancedRadarChart({ directions, responses, scale }: Enh
         .attr('y2', y)
         .attr('class', 'stroke-gray-300');
       
-      // Etiqueta
       const labelRadius = radius + 20;
       svg.append('text')
         .attr('x', labelRadius * Math.cos(angle))
@@ -104,21 +102,8 @@ export default function EnhancedRadarChart({ directions, responses, scale }: Enh
         .text(direction.label);
     });
 
-    // Dibujar áreas para cada respuesta activa
-    Array.from(activeResponses).forEach(index => {
-      const response = responses[index];
-      const color = COLORS[index % COLORS.length];
-      
-      const points = directions.map((direction, i) => {
-        const value = response.values[direction.id] || scale.min;
-        const angle = angleScale(i) - Math.PI / 2;
-        return {
-          x: radiusScale(value) * Math.cos(angle),
-          y: radiusScale(value) * Math.sin(angle)
-        };
-      });
-
-      // Área
+    // Función para dibujar un área
+    const drawArea = (response: Response, color: string, isAverage: boolean = false) => {
       const lineGenerator = d3.lineRadial<{ angle: number; radius: number }>()
         .angle(d => d.angle)
         .radius(d => d.radius)
@@ -132,21 +117,41 @@ export default function EnhancedRadarChart({ directions, responses, scale }: Enh
       svg.append('path')
         .datum(radialData)
         .attr('d', lineGenerator as any)
-        .attr('fill', `${color}20`)
+        .attr('fill', isAverage ? 'none' : `${color}20`)
         .attr('stroke', color)
-        .attr('stroke-width', 2);
+        .attr('stroke-width', isAverage ? 3 : 2)
+        .attr('stroke-dasharray', isAverage ? '5,5' : 'none');
 
-      // Puntos
-      svg.selectAll(`.points-${index}`)
-        .data(points)
-        .join('circle')
-        .attr('cx', d => d.x)
-        .attr('cy', d => d.y)
-        .attr('r', 4)
-        .attr('fill', color);
+      // Puntos solo para respuestas individuales
+      if (!isAverage) {
+        directions.forEach((direction, i) => {
+          const value = response.values[direction.id] || scale.min;
+          const angle = angleScale(i) - Math.PI / 2;
+          const x = radiusScale(value) * Math.cos(angle);
+          const y = radiusScale(value) * Math.sin(angle);
+
+          svg.append('circle')
+            .attr('cx', x)
+            .attr('cy', y)
+            .attr('r', 4)
+            .attr('fill', color);
+        });
+      }
+    };
+
+    // Dibujar respuestas activas
+    Array.from(activeResponses).forEach(index => {
+      const response = responses[index];
+      const color = COLORS[index % COLORS.length];
+      drawArea(response, color);
     });
 
-  }, [directions, responses, scale, activeResponses]);
+    // Dibujar promedio
+    if (responses.length > 0) {
+      drawArea(averageResponse, '#000000', true);
+    }
+
+  }, [directions, responses, scale, activeResponses, averageResponse]);
 
   return (
     <div className="space-y-4">
@@ -176,6 +181,11 @@ export default function EnhancedRadarChart({ directions, responses, scale }: Enh
             {response.name}
           </button>
         ))}
+        {responses.length > 0 && (
+          <div className="px-3 py-1 rounded-full text-sm font-medium bg-black/10 text-black">
+            Promedio ({responses.length} participantes)
+          </div>
+        )}
       </div>
     </div>
   );

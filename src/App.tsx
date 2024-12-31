@@ -1,33 +1,22 @@
-import React, { useState } from 'react';
-import Header from './components/Header';
-import MatrixViewer from './components/MatrixViewer';
-import { exampleDirections } from './data/exampleMatrix';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import MatrixDetail from './pages/MatrixDetail';
+import CreateMatrix from './pages/CreateMatrix';
 
 export default function App() {
-  const [responses, setResponses] = useState<Array<{
-    name: string;
-    role: string;
-    values: Record<string, number>;
-  }>>([]);
-
-  const handleNewResponse = (response: {
-    name: string;
-    role: string;
-    values: Record<string, number>;
-  }) => {
-    setResponses(prev => [...prev, response]);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <MatrixViewer
-          directions={exampleDirections}
-          responses={responses}
-          onNewResponse={handleNewResponse}
-        />
-      </main>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/matrices/new" element={<CreateMatrix />} />
+        <Route path="/matrices/:id" element={<MatrixDetail />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
